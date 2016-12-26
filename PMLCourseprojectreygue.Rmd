@@ -1,0 +1,144 @@
+---
+title: "PMLCourseProject"
+author: "Reynold Guerrier"
+date: "December 25, 2016"
+output:
+  html_document: default
+  pdf_document: default
+---
+## Abstract
+This project aim to use HAR Human Activity Recognition data set to make predictions. We will apply machine learning algorithm on 20 test cases available in the given data set to be able to submit our predictions. We decide to use Classification tree, boosting and linear dicriminant and random forest, a subset of the training data to assess tjeir accuracy level. 
+
+## Getting the data
+
+```{r, echo=FALSE }
+rm(list = ls())
+setwd("/DATA/PERSO/coursera/pml")
+download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", destfile = "/DATA/PERSO/coursera/pml/pml-training.csv", method ="libcurl" )
+
+ download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", destfile = "/DATA/PERSO/coursera/pml/pml-testing.csv", method = "libcurl")
+
+```
+
+```{r, echo=FALSE}
+rm(list = ls())
+library(caret); library(rattle); library(rpart); library(rpart.plot)
+library(randomForest)
+```
+
+## Cleaning and Explanatory Data
+When checking the training and the testing data sets we find out there is a lot of "NA" and some "DIV/0" that must be stripped out because they will not impact the predictions. Other variables like names, identifiers and time aren't useful either  for our work. 
+
+```{r, echo=FALSE}
+training <- read.csv("pml-training.csv", na.strings = c("NA", ""))
+testing <- read.csv("pml-testing.csv", na.strings = c("NA", ""))
+```
+
+## Cleaning the data sets
+
+```{r, echo=FALSE}
+training <- training[, colSums(is.na(training)) == 0]
+testing <- testing[, colSums(is.na(testing)) == 0]
+``` 
+Removing some predictors that are not relevant for our observations. 
+```{r}
+trainData <- training[, -c(1:7)]
+testData <- testing[, -c(1:7)]
+```
+
+with that done we end up with 2 cleaned data sets of training and testing. The training contains a lot observations with more than 60 variables while the testing data set is 20. As variables from Column 1 to 7 are not relevant for our predictions, let's remove them
+
+# Data subsetting
+```{r, }
+set.seed(1234) 
+inTrain <- createDataPartition(trainData$classe, p = 0.7, list = FALSE)
+train <- trainData[inTrain, ]
+valid <- trainData[-inTrain, ]
+```
+
+
+## Prediction Algorithms
+
+We will apply some prediction algorithms and we will choose the more accurate for our test data
+
+# Claissification tree
+```{r, echo=FALSE}
+control <- trainControl(method = "cv", number = 5)
+fit_rpart <- train(classe ~ ., data = train, method = "rpart", 
+                   trControl = control)
+print(fit_rpart, digits = 4)
+
+``` 
+
+Plotting the tree
+
+```{r, echo=FALSE}
+fancyRpartPlot(fit_rpart$finalModel)
+```
+
+```{r, echo=FALSE}
+# predict outcomes using validation set
+predict_rpart <- predict(fit_rpart, valid)
+# Show prediction result
+(conf_rpart <- confusionMatrix(valid$classe, predict_rpart))
+```
+# Classification tree accuracy
+```{r}
+(accuracy_rpart <- conf_rpart$overall[1])
+```
+## Boosting
+Creating the model and predict outcomes using validation set
+```{r, results='hide'}
+library(gbm)
+fit_gbm <- train(classe ~ ., data = train, method = "gbm") 
+predgbm <- predict(fit_gbm, valid)
+(confgbm <- confusionMatrix(valid$classe, predgbm))
+``` 
+ 
+ Accuracy
+
+```{r}
+(accuracy_ <- confgbm$overall[1])
+```
+## Linear Discriminant
+Creating the model and predict outcomes using validation set
+```{r}
+fit_lda <- train(classe ~ ., data = train, method = "lda") 
+predlda <- predict(fit_lda, valid)
+(conflda <- confusionMatrix(valid$classe, predlda))
+``` 
+ 
+ Accuracy
+
+```{r}
+(accuracy_ <- conflda$overall[1])
+```
+## Random Forest
+
+
+```{r}
+fit_rf <- train(classe ~ ., data = train, method = "rf", 
+                   trControl = control) 
+print(fit_rf, digits = 4) 
+``` 
+
+# Prediction on the validation set
+
+```{r}
+# predict outcomes using validation set
+predrf <- predict(fit_rf, valid)
+# Show prediction result
+(confrf <- confusionMatrix(valid$classe, predrf))
+```
+
+# Accuracy
+
+```{r}
+(accuracy_rf <- confrf$overall[1])
+```
+Among all the prediction algorithms the Random Forest offers the best accuracy 0.99 So we will use it to make the predictions on the Testing sets
+
+## Prediction on the testing set
+```{r}
+(predict(fit_rf, testData))
+```
